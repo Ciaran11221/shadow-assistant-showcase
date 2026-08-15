@@ -1,10 +1,11 @@
 # Case studies
 
-Four problems from this project that took real work. Each follows the same
-shape: what it looked like, what I assumed, what the evidence actually said,
-and what I changed.
+Problems from this project that took real work — four recent ones in detail,
+four earlier ones briefly. Each follows the same shape: what it looked like,
+what I assumed, what the evidence actually said, and what I changed.
 
-The pattern across all four is the same, and it's the point of this document.
+The pattern across all of them is the same, and it's the point of this
+document.
 
 ---
 
