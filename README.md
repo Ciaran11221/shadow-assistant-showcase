@@ -1,107 +1,158 @@
-# Shadow — a private, JARVIS-inspired personal AI assistant
+# Shadow
 
-Shadow is a voice assistant I built from scratch that runs across my
-Android phone and Windows desktop: wake-word activated ("Hey Shadow"),
-aware of which device should answer when both hear you, routes what you
-say through a multi-tier AI system to figure out what you actually want,
-and talks back in a fully offline neural voice.
+A private voice assistant that runs on my own hardware — an Android phone and a
+Windows desktop working as one system, with no cloud service in the middle.
 
-This repo is a portfolio showcase — architecture, design decisions, and
-the real engineering problems I hit and solved. **The full working source
-is in a private repo**; happy to share access if you'd like to see it —
-reach out.
+This repository is a write-up. The implementation is private; what's here is
+the design, the reasoning behind it, and a few debugging stories that show how
+the harder problems were actually solved.
 
 ---
 
 ## What it does
 
-- **Wake-word activation** on both a Windows desktop app and an Android
-  client, running a local Whisper model to detect "Hey Shadow" and
-  transcribe what follows.
-- **Cross-device arbitration** — if both my phone and desktop hear the
-  wake phrase at once, they negotiate over the network so only one
-  answers, instead of both talking over each other.
-- **AI-based command routing** — instead of brittle regex trigger
-  phrases, spoken commands (however messily phrased, in any word order)
-  are classified and parsed into structured actions by an LLM, with a
-  three-tier fallback chain: a free fast model first, a free fallback
-  model second, and a paid model only as a last resort or on explicit
-  request — with a hard, persistent spend cap so the paid tier can never
-  run away on cost.
-- **Real skills**: note-taking (with a multi-turn "anything else to add?"
-  confirmation loop so a dropped mic never loses your note, and automatic
-  date-based file organization), calendar scheduling via the Google
-  Calendar API, spoken definitions/translations/news briefings, and a
-  personality system with switchable voices.
-- **Fully offline text-to-speech** via a local neural TTS engine — no
-  cloud voice API, no per-word cost, works without internet.
-- **Live-tunable behavior** — things like how patient it is before
-  assuming you've stopped talking, mic sensitivity, and how often it adds
-  a little personality to routine replies are all adjustable by voice
-  command in real time, not hardcoded constants that need a redeploy.
+Say "Hey Shadow" and it answers — from whichever device is nearest, in a
+consistent synthesised voice, without sending your speech to anyone.
+
+- **News** — briefings filtered against your stated interests and tolerance,
+  drillable by topic or position ("the third one"), with stories you've already
+  heard suppressed for six hours so asking twice moves forward instead of
+  replaying.
+- **Notes** — with a multi-turn "anything else to add?" loop, so a dropped word
+  never costs you the note, and automatic date-based filing.
+- **Calendar** — scheduling through the Google Calendar API, which asks for a
+  date and time rather than guessing when you didn't give one.
+- **Weather, music, personas, preferences** — each a self-contained skill.
+- **Wakes the desktop when it's asleep**, queues what you asked for, and runs it
+  once the machine is up — so a sleeping PC costs you a few seconds, not a lost
+  request.
+- **Interruptible.** Talk over it and it stops mid-sentence, keeps the context,
+  and takes whatever you say next as the new request.
+
+---
+
+## Why it exists
+
+Two reasons, honestly. I wanted an assistant that didn't ship my kitchen
+conversations to a third party. And I wanted a project big enough that the
+interesting problems would be *systems* problems — concurrency, device
+coordination, latency, hardware that doesn't behave as documented — rather than
+tutorial problems.
+
+It has delivered on the second more than I expected.
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────┐        ┌──────────────────┐
-│  Android client   │◄──────►│  Windows desktop  │
-│  (Kotlin)          │  private  │  Core (FastAPI /  │
-│                     │  network  │  WebSocket) +      │
-└─────────────────┘        │  voice pipeline    │
-                             └──────────────────┘
-                                       │
-                         ┌─────────────┴─────────────┐
-                         │      AI command router      │
-                         │  fast free tier → free      │
-                         │  fallback → paid escalation  │
-                         │  (budget-capped)              │
-                         └─────────────┬─────────────┘
-                                       │
-                    ┌──────────┬───────┼───────┬──────────┐
-                 notes     calendar  knowledge  persona  settings
+   ┌────────────────┐         ┌────────────────┐
+   │  Android app   │         │ Desktop client │
+   │  (Kotlin)      │         │  (Python)      │
+   │                │         │                │
+   │  wake word     │         │  wake word     │
+   │  capture       │         │  capture       │
+   │  playback      │         │  playback      │
+   └───────┬────────┘         └───────┬────────┘
+           │      WebSocket over      │
+           │    a private VPN mesh    │
+           └────────────┬─────────────┘
+                        │
+                ┌───────▼────────┐
+                │      Core      │
+                │   (FastAPI)    │
+                │                │
+                │  arbitration   │
+                │  routing       │
+                │  speech synth  │
+                └───────┬────────┘
+                        │
+                ┌───────▼────────┐
+                │     Skills     │
+                │  self-registering
+                │  news · weather · calendar
+                │  notes · music · settings
+                └────────────────┘
 ```
 
-## A few of the harder problems I solved
+**Core owns everything shared** — which device has the floor, how a request maps
+to a skill, and voice synthesis. Clients are deliberately thin: capture audio,
+send text, play what comes back.
 
-**A silent startup crash with no error output.** The desktop app runs
-with no console window via `pythonw.exe`, whose `sys.stdout` isn't just
-non-interactive — it's `None`. That broke the web server's default
-logging setup in a way that produced zero diagnostic output, so the app
-just silently died. Root-caused by instrumenting every startup step with
-explicit file logging and defensively handling the `None` stream case.
+That split is what makes the desktop and the phone behave identically. It also
+means a new skill is available on every device the moment it exists, with no
+client change.
 
-**A multi-second lag after every wake phrase.** Traced to a Windows
-quirk: resolving `"localhost"` tries IPv6 before falling back to IPv4,
-and that fallback delay got worse with a VPN mesh network's virtual
-interfaces active. Fixed by connecting to `127.0.0.1` explicitly instead
-of relying on hostname resolution.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the parts worth explaining properly.
 
-**Regex trigger phrases couldn't handle real speech.** Commands like
-"meeting Friday 2:32pm calendar" — trigger word at the end, date and time
-in the middle — broke phrase-anchored regex matching entirely. That
-pushed a mid-project pivot to full AI-based intent classification and
-slot extraction, which handles arbitrary phrasing and word order for
-free.
+---
 
-**Losing the first word of every command.** "Take note, buy milk"
-consistently transcribed as "note, buy milk" — the recording start had a
-small timing race against when you actually started speaking. Fixed with
-a continuously-recording ring buffer that gets prepended to every capture
-as a safety margin.
+## Engineering highlights
 
-**Making a paid AI tier that can't overspend.** The escalation tier
-(used rarely, only when the free tiers can't confidently handle
-something) tracks every call's token cost against a persistent, hard
-spend cap stored locally — once hit, Shadow simply stops using the paid
-tier rather than risk running past a limit I set.
+**Skills self-register.** Adding a capability means adding one file. The router
+discovers it, reads its self-description, and includes it in AI routing —
+nothing central knows any skill by name. Before this refactor, a new skill meant
+edits in four places and a chance to forget one.
 
-## Tech stack
+**Multi-tier AI routing with a budget guard.** Requests fall through a fast free
+model, then a second, then a paid one, degrading to regex matching if all three
+are unavailable. Cost is capped and the assistant keeps working when it's
+exhausted — just less cleverly.
 
-Python (FastAPI, WebSockets, faster-whisper, a local neural TTS engine),
-Kotlin/Android, a multi-provider LLM routing layer, Google Calendar API,
-and a private mesh network (Tailscale) linking the devices.
+**Two-layer listening.** A small keyword-spotting model runs continuously and
+does nothing but score audio against one phrase. Full speech recognition only
+starts once that fires. This replaced an always-on recogniser and cut idle
+battery drain substantially.
+
+**Wake-on-LAN with an offline queue.** Commands issued while the desktop is
+asleep are stored on the phone, a magic packet is sent, and a background drainer
+runs them when the machine answers. Acknowledged immediately, so you never stand
+waiting on a boot.
+
+**Latency as a feature.** Fixed phrases are pre-rendered as audio clips in the
+real voice, so "Yes?" is instant rather than synthesised. Slow skills speak an
+interim line while they work, because several seconds of silence is
+indistinguishable from being ignored. Synthesis is streamed sentence by
+sentence rather than rendered whole.
+
+**Device arbitration.** Both devices hear "Hey Shadow". A claim protocol with a
+pooling window, priority ordering, and a cooldown ensures exactly one answers.
+Naming a device explicitly ("Hey Phone") bypasses arbitration entirely, and
+wearing a Bluetooth headset counts as naming it.
+
+---
+
+## What I'd point at in an interview
+
+Not the feature list — the [case studies](CASE-STUDIES.md).
+
+Three times on this project I fixed something by reasoning about it, watched the
+fix make things worse, and had to conclude I'd been guessing. The response was
+to stop guessing: build the instrumentation that would settle the question, then
+read it.
+
+That shift — from "this should work" to "the log says" — is the most useful
+thing I've taken from building this, and it's what those write-ups are about.
+
+---
+
+## Built with
+
+**Android** — Kotlin, coroutines, foreground service, `SpeechRecognizer`,
+`AudioRecord`, Bluetooth audio routing, OkHttp
+**Desktop** — Python, FastAPI, WebSockets, Whisper, Piper TTS with a custom
+effects chain
+**Wake word** — sherpa-onnx keyword spotting, on-device, open-vocabulary
+**Networking** — WebSocket over a private VPN mesh, Wake-on-LAN
+**AI** — tiered routing across three providers with cost control
+
+---
 
 ## Status
 
-Actively developed, personal daily-use project and portfolio piece.
-Full source available privately on request.
+Actively developed, and in daily use — which is why the problems in the case
+studies are the ones they are. Most of them only surface when you rely on
+something every day rather than demoing it.
+
+Full source is in a private repository. Happy to share access or walk through
+any part of it — just ask.
