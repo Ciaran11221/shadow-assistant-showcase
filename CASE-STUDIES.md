@@ -186,9 +186,37 @@ encodes an assumption is worse than no label at all.
 
 ---
 
-## 5. Earlier problems, more briefly
+## 5. The answer it already had
 
-Four from earlier in the project. Same shape, less space.
+**Symptom.** Mid-conversation, I mentioned a friend's name and a fact about
+them in passing — never said "remember this," just said it. A few turns
+later I asked whether it had caught that. It told me, flatly, that it had no
+record of the conversation at all.
+
+**What I assumed.** That this was a memory gap — the fact simply hadn't been
+saved, and the honest answer was "no."
+
+**Why that was wrong.** It had been saved. The fact was sitting in the exact
+context every reply already has access to, at the moment the denial was
+generated. The model wasn't missing information. It had the right context in
+front of it and produced a fluent, confident, wrong answer anyway.
+
+**What I built.** A question shaped like "did you remember X" or "what did I
+tell you about X" is now answered by a direct, deterministic lookup against
+what's actually stored, before the model is ever asked. Not a better prompt
+asking it to please check its context properly — removing the step where it
+gets to guess.
+
+**The lesson.** Having the right information available isn't the same as
+using it. For anything that has to be *right* rather than *plausible*, the
+fix isn't phrasing the question better. It's not asking a model the question
+at all.
+
+---
+
+## 6. Earlier problems, more briefly
+
+Six from earlier in the project. Same shape, less space.
 
 **A silent startup crash with no error output.** The desktop app runs without a
 console window via `pythonw.exe`, whose `sys.stdout` isn't merely
@@ -220,6 +248,25 @@ actually began speaking. Fixed with a continuously-recording ring buffer
 prepended to every capture, so the audio always begins slightly before the
 trigger. You cannot react fast enough to a sound you haven't heard yet — the
 only fix is to already have been recording.
+
+**A cancel that didn't cancel everything.** A skill mid-conversation keeps its
+own private state — waiting on a yes/no, a name change, a delete
+confirmation. Interrupting with a fresh wake cleared the top-level
+bookkeeping but left that private state untouched, so a confirmation you'd
+walked away from could resurface later and the assistant would get stuck
+re-asking a question you'd already abandoned, forever. Every piece of state
+like this now gets its own explicit clear, wired into the same interrupt
+path — a lesson that had to be relearned a second time, for a fourth piece of
+state, a day after fixing it for the first three.
+
+**A fix for quiet speech that made quiet speech untestable.** Detected speech
+below a certain volume gets automatically boosted before anything downstream
+sees it — reasonable, since a mumbled command still deserves a chance. It
+also meant that any test simulating a quiet or distant voice got quietly
+un-simulated: the same boost fired during the test, so "how does this handle
+quiet speech" could never actually be answered by turning the volume down and
+checking. Testing that specific condition now has to explicitly bypass the
+boost it exists to prove is doing its job.
 
 ---
 

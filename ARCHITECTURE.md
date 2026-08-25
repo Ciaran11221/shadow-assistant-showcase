@@ -70,10 +70,9 @@ confidently wrong about a phrase with an unambiguous form.
 
 ### Model tiers
 
-Three providers in cost order — a fast free model, then a second, then a paid
-one — with a budget guard that stops the paid tier when a spending cap is hit.
-Below the tiers is regex matching, so the assistant degrades rather than
-breaking.
+Four providers in cost order — three free in sequence, then a paid one — with
+a budget guard that stops the paid tier when a spending cap is hit. Below the
+tiers is regex matching, so the assistant degrades rather than breaking.
 
 Requests are also classified as *factual* or *conversational*. Factual requests
 drop the persona prompt and run at low temperature; they need to be right, not
@@ -205,3 +204,19 @@ because "say that again" must not be suppressed by a repeat filter.
 - Nothing is inferred and quietly stored. Everything Shadow knows about you was
   stated on purpose, can be listed back, and can be removed. A profile that
   grows on its own is one you can't reason about.
+
+**Two different questions get two different gates.** "Is this roughly the
+same person talking?" and "is this person allowed to change something
+permanent?" don't need the same certainty, and answering both with one
+threshold causes real problems — loosen it and a stranger gets through,
+tighten it and the real user gets locked out on an off day, and no single
+number avoids both. So they're separate: an ongoing, low-stakes voice signal
+that informs conversation but never blocks it, and a short spoken code
+required only at the moment something permanent is actually written or
+deleted — checked the same way regardless of who the voice sounds like.
+
+**Short-term memory expires on purpose.** What's said in a session is kept
+for the day, searchable, then gone — nothing persists past that without a
+deliberate save. Saving something permanently, or deleting it, goes through
+the confirm-then-code gate above; nothing reaches long-term storage as a
+side effect of ordinary conversation.

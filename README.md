@@ -120,6 +120,28 @@ pooling window, priority ordering, and a cooldown ensures exactly one answers.
 Naming a device explicitly ("Hey Phone") bypasses arbitration entirely, and
 wearing a Bluetooth headset counts as naming it.
 
+**Nothing permanent without asking twice.** Saving a new fact — a name, a
+contact, a preference — means the words get confirmed back before anything
+sticks. Deleting something already saved needs that same confirmation and a
+short spoken code besides. The two are protected differently on purpose:
+getting an add wrong is clutter you can remove; getting a delete wrong
+destroys something.
+
+**A stall that fixes itself.** The desktop's audio input can silently stop
+delivering data — a driver hiccup, a device change — and nothing about that
+looks like an error, the process just goes quiet. Listening now tracks the
+gap since the last chunk arrived and reopens the input stream itself once
+it's been stalled too long, rather than needing a restart. It's since caught
+and recovered from a real nineteen-second stall during normal use, unprompted.
+
+**Breaking the voice pipeline on purpose, so it doesn't break by accident.**
+A real recording gets pushed through independent, worsening distortions —
+slurred, quieted, buried in noise — and re-run through the actual
+recognition pipeline until it reliably fails. That failure point is a number,
+tracked over time, so a fix can be proven rather than felt. It runs itself
+now: real audio from normal use gets swept automatically in the background,
+off the assistant's own thread, so testing never costs it any responsiveness.
+
 ---
 
 ## What I'd point at in an interview
@@ -144,7 +166,7 @@ thing I've taken from building this, and it's what those write-ups are about.
 effects chain
 **Wake word** — sherpa-onnx keyword spotting, on-device, open-vocabulary
 **Networking** — WebSocket over a private VPN mesh, Wake-on-LAN
-**AI** — tiered routing across three providers with cost control
+**AI** — tiered routing across four providers with cost control
 
 ---
 
