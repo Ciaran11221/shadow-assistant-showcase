@@ -129,7 +129,7 @@ system.
 Some things only the desktop can do. It's also usually asleep.
 
 1. The command is stored on the phone.
-2. A Wake-on-LAN packet goes out over the LAN.
+2. A Wake-on-LAN packet goes out — **twice, by two different routes.**
 3. **You're acknowledged immediately** — "Loading remote device" — rather than
    standing waiting on a boot.
 4. A background drainer polls until Core answers, then runs what's queued and
@@ -139,8 +139,29 @@ Commands are deleted only once Core has actually handled them. If the wake
 fails, the app is killed, or the phone reboots, they're still on disk and get
 retried.
 
-The honest limitation: a magic packet is LAN-broadcast only and can't route over
-the VPN, so this works at home and says so clearly when it doesn't.
+**The interesting limitation, and how it got solved.** A Wake-on-LAN packet is
+a LAN broadcast — it can't route over the internet, and it can't route over the
+VPN either, because a sleeping machine's own VPN client is asleep along with
+it. That's physics, not a missing setting, so it holds regardless of how the
+network is configured.
+
+The fix isn't in the phone or the desktop at all. It's a third, tiny device: an
+old phone left permanently awake on the home network, running a stripped-down
+relay with exactly one job — accept "wake the desktop" over the VPN, and put
+the broadcast on the LAN it's actually sitting on. The main phone fires both
+routes on every attempt: the direct packet, which is instant when you're home
+and needs nothing else running, and the relay, which is the only one that can
+possibly work from a phone on mobile data three hundred miles away.
+
+The relay is deliberately built as its own standalone thing — no shared code,
+no shared config with the rest of the system. It exists specifically for the
+moment the main system is asleep or broken, so it can't depend on anything
+that might be down at that moment.
+
+Verified, not assumed: phone on mobile data, Wi-Fi off, desktop asleep, a
+command queued. The direct packet failed exactly as expected. The relay
+carried the request over the VPN, broadcast it locally, and the desktop came
+up.
 
 ---
 

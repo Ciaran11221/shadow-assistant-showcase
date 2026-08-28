@@ -25,7 +25,9 @@ consistent synthesised voice, without sending your speech to anyone.
 - **Weather, music, personas, preferences** — each a self-contained skill.
 - **Wakes the desktop when it's asleep**, queues what you asked for, and runs it
   once the machine is up — so a sleeping PC costs you a few seconds, not a lost
-  request.
+  request. Works from anywhere, not just the home network — a magic packet
+  can't route over the internet, so a small always-on relay device sits on the
+  home LAN and does that last local hop on request.
 - **Interruptible.** Talk over it and it stops mid-sentence, keeps the context,
   and takes whatever you say next as the new request.
 
@@ -104,10 +106,16 @@ does nothing but score audio against one phrase. Full speech recognition only
 starts once that fires. This replaced an always-on recogniser and cut idle
 battery drain substantially.
 
-**Wake-on-LAN with an offline queue.** Commands issued while the desktop is
-asleep are stored on the phone, a magic packet is sent, and a background drainer
-runs them when the machine answers. Acknowledged immediately, so you never stand
-waiting on a boot.
+**Wake-on-LAN with an offline queue, working from anywhere.** Commands issued
+while the desktop is asleep are stored on the phone, a wake attempt goes out on
+two independent routes, and a background drainer runs the queue when the
+machine answers. A magic packet is a LAN broadcast, so it can't reach a
+sleeping machine over the internet — a small relay device left running on the
+home network exists purely to carry the request that last local step, which is
+what makes this work from mobile data and not only from home Wi-Fi. See
+[case study 6](CASE-STUDIES.md#6-the-magic-packet-that-couldnt-leave-the-house)
+for how that was found and fixed. Acknowledged immediately either way, so you
+never stand waiting on a boot.
 
 **Latency as a feature.** Fixed phrases are pre-rendered as audio clips in the
 real voice, so "Yes?" is instant rather than synthesised. Slow skills speak an
@@ -165,7 +173,8 @@ thing I've taken from building this, and it's what those write-ups are about.
 **Desktop** — Python, FastAPI, WebSockets, Whisper, Piper TTS with a custom
 effects chain
 **Wake word** — sherpa-onnx keyword spotting, on-device, open-vocabulary
-**Networking** — WebSocket over a private VPN mesh, Wake-on-LAN
+**Networking** — WebSocket over a private VPN mesh, Wake-on-LAN with a relay
+device for off-network wake
 **AI** — tiered routing across four providers with cost control
 
 ---
