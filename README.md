@@ -22,7 +22,15 @@ consistent synthesised voice, without sending your speech to anyone.
   never costs you the note, and automatic date-based filing.
 - **Calendar** — scheduling through the Google Calendar API, which asks for a
   date and time rather than guessing when you didn't give one.
-- **Weather, music, personas, preferences** — each a self-contained skill.
+- **Weather, music, contacts, tasks, personas, preferences** — each a self-contained
+  skill, added by dropping in one file.
+- **Body vitals** — flags a reading against your own history rather than a
+  hardcoded threshold, and refuses to diagnose.
+- **A private journal** that voice cannot reach at all. Not "discouraged from"
+  reaching — structurally unable to: the module opts out of routing entirely,
+  so no phrasing of any sentence can reach it. Entries are categorised into a
+  private spreadsheet and the local copies deleted only once the write is
+  confirmed.
 - **Wakes the desktop when it's asleep**, queues what you asked for, and runs it
   once the machine is up — so a sleeping PC costs you a few seconds, not a lost
   request. Works from anywhere, not just the home network — a magic packet
@@ -72,8 +80,9 @@ It has delivered on the second more than I expected.
                 ┌───────▼────────┐
                 │     Skills     │
                 │  self-registering
-                │  news · weather · calendar
-                │  notes · music · settings
+                │  news · weather · calendar · notes
+                │  music · contacts · tasks · vitals
+                │  journal · settings · personas
                 └────────────────┘
 ```
 
@@ -135,12 +144,60 @@ short spoken code besides. The two are protected differently on purpose:
 getting an add wrong is clutter you can remove; getting a delete wrong
 destroys something.
 
+**A boundary I only found by attacking my own system.** Core's WebSocket
+originally accepted any client that could reach its port. The `device` field
+identifying the caller was supplied *by the caller* and proved nothing, which
+meant anything on the network could change settings, attach extensions, and —
+before a filename guard landed the same day — delete arbitrary files through a
+path traversal. Closed with a shared secret the phone presents on connect. The
+part worth saying out loud is that nothing external found this: it needed
+someone to sit down and ask what the connection actually verified, and the
+answer was nothing at all.
+
+Two gates guard the sensitive paths and they deliberately fail in *opposite*
+directions. The spoken code protecting deletions fails closed — unconfigured
+means refuse. The connection token fails open — unconfigured means allow.
+Symmetry would have been the wrong instinct: a locked-out setting is an
+inconvenience, while a connection layer that fails closed before you've
+provisioned it locks every device out of the system at once, including the one
+you'd use to fix it.
+
+**Sensitive screens share one lock.** What began as three separately-built PIN
+systems — one for settings, one for the coding tool, one for health data, each
+reasoned about on its own — is now a single hardware-backed prompt (fingerprint
+or the phone's own lock-screen credential) reused across seven screens. The
+tradeoff is stated rather than hidden: any fingerprint enrolled on the phone is
+trusted by all of them, on the explicit judgement that the physical device is
+the real boundary.
+
 **A stall that fixes itself.** The desktop's audio input can silently stop
 delivering data — a driver hiccup, a device change — and nothing about that
 looks like an error, the process just goes quiet. Listening now tracks the
 gap since the last chunk arrived and reopens the input stream itself once
 it's been stalled too long, rather than needing a restart. It's since caught
 and recovered from a real nineteen-second stall during normal use, unprompted.
+
+**Measuring a model instead of trusting it.** One feature reads back a month of
+journal entries and reports patterns — the kind of task where a wrong answer is
+indistinguishable from a right one unless you check. So I built an evaluation
+that plants a known pattern and checks the model finds it, alongside a
+pure-noise case that it must report as having no pattern. The free tier scored
+3/5 and then 1/5 on byte-identical input across consecutive runs, and on the
+worse run claimed a pattern in the noise — the one failure that actually
+matters, since inventing a trend in someone's private journal is worse than
+declining to answer. That feature now runs on a pinned paid model. The open
+question I haven't closed: every other call site makes the same free-tier
+assumption and hasn't been checked this way.
+
+**Randomised testing on the paths that can't be undone.** Most of this system's
+worst case is a wrong answer. Two paths destroy data instead, and those get
+adversarial harnesses rather than examples: randomised stores thrown at the
+export-then-delete path against a one-line invariant (*after = before −
+exported*), plus an injected mid-export outage to prove nothing is deleted when
+the write fails. The very first run found a real bug — deletion matched entries
+by value, so exporting one of two identical entries destroyed both, with no
+second copy anywhere. Around 1,500 assertions across 36 suites run offline in
+under a minute; twenty-four separate harnesses fuzz the riskier surfaces.
 
 **Breaking the voice pipeline on purpose, so it doesn't break by accident.**
 A real recording gets pushed through independent, worsening distortions —
@@ -170,8 +227,9 @@ thing I've taken from building this, and it's what those write-ups are about.
 
 **Android** — Kotlin, coroutines, foreground service, `SpeechRecognizer`,
 `AudioRecord`, Bluetooth audio routing, OkHttp
-**Desktop** — Python, FastAPI, WebSockets, Whisper, Piper TTS with a custom
-effects chain
+**Desktop** — Python, FastAPI, WebSockets, Whisper, and three interchangeable
+offline TTS engines (Piper with a custom effects chain, Kokoro, XTTS) — no cloud
+speech synthesis anywhere
 **Wake word** — sherpa-onnx keyword spotting, on-device, open-vocabulary
 **Networking** — WebSocket over a private VPN mesh, Wake-on-LAN with a relay
 device for off-network wake
@@ -184,6 +242,13 @@ device for off-network wake
 Actively developed, and in daily use — which is why the problems in the case
 studies are the ones they are. Most of them only surface when you rely on
 something every day rather than demoing it.
+
+Roughly 55,000 lines of Python and Kotlin, around 50 self-registering skill
+modules, and a test suite of about 1,500 assertions that runs offline. The
+private repository keeps a "critiques and roadmap" section listing what's
+weakest and what's built but not yet verified in real use — it's maintained
+in the same spirit as the case studies here, and it's usually the more
+interesting document.
 
 Full source is in a private repository. Happy to share access or walk through
 any part of it — just ask.

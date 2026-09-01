@@ -220,6 +220,9 @@ because "say that again" must not be suppressed by a repeat filter.
   never sent to a cloud recogniser.
 - Only the resulting **text** reaches Core, over a private VPN mesh — never the
   open internet.
+- Clients **authenticate on connect** with a shared secret. The mesh alone was
+  once treated as sufficient; it isn't, because it makes every device on the
+  network a trusted one. Identity asserted by the caller is not identity.
 - Personal data — location, interests, preferences, credentials — is local and
   git-ignored.
 - Nothing is inferred and quietly stored. Everything Shadow knows about you was
@@ -241,3 +244,38 @@ for the day, searchable, then gone — nothing persists past that without a
 deliberate save. Saving something permanently, or deleting it, goes through
 the confirm-then-code gate above; nothing reaches long-term storage as a
 side effect of ordinary conversation.
+
+---
+
+## How this gets verified
+
+A voice assistant is awkward to test: the interesting failures involve a
+microphone, a room, and a person talking. Three layers cover that.
+
+**Unit suites, offline.** Around 1,500 assertions across 36 suites, no network
+and no audio hardware required, running in about a minute. Each suite runs in
+its own process — one of them deliberately swaps out the routing modules to
+test the router in isolation, which is fine alone and poisonous to anything
+importing them for real afterwards.
+
+**Audio injection instead of a microphone.** Recorded and synthesised speech is
+fed directly through the real detection functions — the same code path a live
+microphone reaches, minus the microphone. That makes barge-in, wake detection,
+and echo settling reproducible rather than something you evaluate by talking at
+a laptop and forming an impression. It also surfaced a genuinely awkward
+finding: a fix that boosts quiet speech was also boosting the *test* audio, so
+"how does this behave with a quiet voice" was a question the test suite was
+structurally unable to answer until the boost was explicitly bypassed.
+
+**Adversarial harnesses on the risky surfaces.** Twenty-four of them, aimed at
+places where correctness is hard to eyeball: misspelled and ambiguous natural
+dates, cross-skill phrase collisions, scope leaks between isolated skills, and
+above all the irreversible delete paths, which are fuzzed with randomised
+inputs against an explicit invariant rather than hand-picked examples. The
+distinction that drives all of it: most of this system's worst case is a wrong
+answer you can correct, and a small number of paths have a worst case of data
+that no longer exists anywhere.
+
+What this does *not* cover is stated plainly in the private repo's roadmap:
+work that is built, unit-tested, and installed but never yet exercised by hand
+in real use is tracked as a standing debt rather than counted as finished.
