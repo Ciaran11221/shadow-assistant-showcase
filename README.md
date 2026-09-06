@@ -1,7 +1,12 @@
 # Shadow
 
-A private voice assistant that runs on my own hardware — an Android phone and a
-Windows desktop working as one system, with no cloud service in the middle.
+A private, JARVIS-inspired AI system spanning an Android phone and a Windows
+desktop, working as one machine with no cloud service in the middle.
+Wake-word activated, cross-device aware, and extended by 24 capability modules
+it discovers at runtime.
+
+69,000 lines of Python and Kotlin. 8,111 test assertions across 62 CI-gated
+suites, 94 merged pull requests. Running cost to date: 97 cents.
 
 This repository is a write-up. The implementation is private; what's here is
 the design, the reasoning behind it, and a few debugging stories that show how
@@ -206,6 +211,17 @@ recognition pipeline until it reliably fails. That failure point is a number,
 tracked over time, so a fix can be proven rather than felt. It runs itself
 now: real audio from normal use gets swept automatically in the background,
 off the assistant's own thread, so testing never costs it any responsiveness.
+
+**Saying no to my own idea.** Mid-build on a feature, I proposed a bigger
+version of it to myself: three tools able to hand off between them and
+reference each other's prior work automatically. Before writing any of it,
+I reasoned through what it would actually cost — a live search integration
+versus a cheaper but staler model-only guess, a fixed pipeline versus a
+general graph where anything can call anything — and concluded the
+ambitious version wasn't the right thing to build first. I shipped the
+concrete entry point that was actually needed, wrote the two open decisions
+down for later, and left the rest deliberately unbuilt rather than build it
+because I could.
 
 ---
 
