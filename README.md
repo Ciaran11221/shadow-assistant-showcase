@@ -146,10 +146,14 @@ which boots actually worked — four startup checkpoints plus a soak window, so 
 crash loop can't keep stamping itself as healthy — and keeps a small rolling
 snapshot of configuration in front of the encrypted backup. It diagnoses and
 reports; it restores nothing without someone pressing a button, and it never
-puts source files back, because git already holds every version of those. See
+puts source files back, because git already holds every version of those.
+Live-verified against a running instance afterward — real process kills, a
+byte-hash-checked restore, the actual crash-loop dialog on screen — with one
+check honestly left open rather than rounded up. See
 [case study 13](CASE-STUDIES.md#13-the-one-word-default-that-would-have-left-the-machine-unstartable)
 for the threading default that would have made a restart leave the machine down,
-and for the two faults the same review found in my own plan.
+the two faults the same review found in my own plan, and what the live run
+found (and didn't) afterward.
 
 **Latency as a feature.** Fixed phrases are pre-rendered as audio clips in the
 real voice, so "Yes?" is instant rather than synthesised. Slow skills speak an

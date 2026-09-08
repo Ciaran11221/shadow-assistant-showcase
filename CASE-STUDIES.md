@@ -800,6 +800,40 @@ generator got wrong; reviewing it against a specification you wrote yourself
 catches what *you* got wrong — and that second one is easier to miss,
 precisely because the code agrees with you.
 
+**Part two: verifying the fix, and the one thing I couldn't.** A fix
+reviewed on a diff is still a claim until it runs against a real system. So
+I ran it — a real desktop app, real process kills, a real socket, no mocks.
+
+Five of six planned checks passed with numbers I actually measured, not
+inferred: two independent boots reached the "healthy" state at ~121 seconds
+against a 120-second target; forty real kills against the live snapshot
+-writing function, fired mid-write, produced zero corrupt files; a restore
+came back byte-for-byte identical, verified by hash rather than a glance,
+and touched nothing else on disk; a crash-loop refusal fired for real — the
+actual system dialog, on screen — while a manual restart stayed provably
+unblocked at the same time; an unauthenticated write request sent over the
+live network socket was refused and confirmed, again by hash, to change
+nothing.
+
+The sixth check — does quitting inside that 120-second window actually
+avoid the hang the fix exists to prevent — I could not complete. There was
+no tool available to me for driving the native desktop UI: no way to click
+the system tray's own menu. I tried the nearest safe substitute, a
+graceful process-close signal, and it reached the target process (confirmed
+against the running log and the durable state file) but produced no
+response at all. Even the "safe" workaround didn't exercise the code path
+in question.
+
+I reported that plainly rather than rounding a near-miss up to a pass. The
+one property left open is written down as open, not folded into "verified"
+because four other properties near it were.
+
+**What I take from it, the second time.** A fix that passes review still
+owes you a real run before "done" means anything. And when a planned check
+turns out to need a tool you don't have, the honest move is to say exactly
+which one and why — not to substitute a weaker check and let the report
+imply it covered the same ground.
+
 ---
 
 ## 14. Earlier problems, more briefly
