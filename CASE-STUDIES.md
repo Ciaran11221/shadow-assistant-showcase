@@ -1,8 +1,13 @@
 # Case studies
 
-Problems from this project that took real work — ten recent ones in
+Problems from this project that took real work — twelve recent ones in
 detail, six earlier ones briefly. Each follows the same shape: what it looked like,
 what I assumed, what the evidence actually said, and what I changed.
+
+Two of them (11 and 12) come from the way this project is now built: I
+plan a change, an AI coding agent implements it, and I review the diff
+rather than the summary it hands back. Both are included because of what
+that review caught, not in spite of it.
 
 The pattern across all of them is the same, and it's the point of this
 document.
@@ -543,7 +548,181 @@ it.
 
 ---
 
-## 11. Earlier problems, more briefly
+## 11. The document that was wrong about its own repository
+
+**Symptom.** None in the code. The failure was in a handoff document — the
+kind I write at the end of a working session so the next one doesn't start
+cold. This one carried a section headed "where things actually are,
+verified not assumed", listing which parts of a feature existed and which
+didn't. Three of its rows said a component "does not exist". An
+architectural decision had been built on top of those three rows, and was
+sitting open, waiting on me.
+
+**What I assumed.** That a section explicitly labelled "verified not
+assumed" had been verified. It named specific files and specific handler
+functions, in the tone of something checked rather than remembered. The
+decision it framed offered three ways forward, and that framing only makes
+sense if those three things are genuinely missing.
+
+**Why that was wrong.** All three existed. The session-persistence module
+was on disk at 17 KB. All six network handlers it claimed were missing
+were in the main server file, at line numbers I could point at. The phone
+screen it described as an unbuilt placeholder was written and compiled,
+and the file that supposedly still held the placeholder had a comment
+saying it had been replaced.
+
+They had been merged the previous evening at 20:12. One command settles
+when:
+
+```
+git merge-base --is-ancestor 31f64f5 HEAD
+```
+
+It confirms the branch was cut *after* that merge. The code was sitting in
+the working directory of the session that wrote "does not exist", the
+entire time it was writing it.
+
+**What that cost.** Of the three paths the decision offered, one was
+"build this whole component first" — already done, the previous evening.
+Another was "leave it as a script-only tool and put it on the phone
+later" — it was on the phone already. Two of three options were answers to
+a question that had stopped being a question. Meanwhile the real problem
+underneath, two overlapping stores for the same state, wasn't described
+anywhere, because the document couldn't see it from where it thought it
+was standing.
+
+**What I built.** Not code, at first. The correction went into the new
+plan as its own opening section, with the measurement beside each claim —
+file size, line numbers, the ancestry command and its output — so the next
+reader can re-run them instead of trusting me the way I'd trusted the last
+document. The stale rows were struck through in place rather than deleted,
+each annotated with which half of it had actually been right. One row was
+partly correct, and quietly rewriting it would have destroyed that
+distinction.
+
+Then the check that made the difference. The claim "this module does not
+exist" is disproved by `ls`. That is a one-second command, and nobody ran
+it, because the sentence was already written down in a section that said
+it had been.
+
+**The lesson.** A tool returning nothing isn't evidence of absence until
+you know the tool could have seen it — and a *document* returning nothing
+is weaker evidence still, because a document can't see anything at all. It
+records what someone believed at a moment, and it starts decaying the
+instant it's written. "Verified" in a heading is a claim about the past,
+not a property of the present.
+
+This is the fourth time in this project that a confident statement of
+absence turned out to be a stale or structurally blind check. The others:
+a service reported down that was serving fine the whole time, a crash
+diagnosed that had never happened, and a branch reported missing that
+existed but hadn't been fetched. That repetition is why my working notes
+for this project now require naming the single check that would
+*disprove* a diagnosis, and running that one — not the check that would
+confirm it.
+
+---
+
+## 12. A version bump that would have made real work unopenable
+
+**Symptom.** None yet. This one was caught in design, which is the only
+place it could have been caught cheaply.
+
+**The setup.** Two pieces of state storage had grown up independently for
+the same feature: one holding a planning tool's own session, the other
+holding the handoff between four separate pipeline stages. They
+overlapped, they didn't reference each other, and they disagreed about
+something real — one of them stored a progress count on disk, the other
+deliberately recomputed it on every read so it could never drift from the
+data it summarises. Merging them meant changing the file format, which
+meant incrementing the schema version integer stamped into every file.
+
+**What I checked before writing the plan.** What the existing version
+policy actually does on a mismatch. It's strict, and deliberately
+asymmetric: a *temporary* session at an unrecognised version is discarded
+with a message naming both versions; a *saved* session is refused
+outright, named, and **left on disk untouched**. That asymmetry is right —
+throwing away something a person explicitly chose to keep is worse than
+declining to open it.
+
+Then what was actually on disk:
+
+```
+2026-09-07 202012060642  saved=True  status=ready
+"Logs are sent to many different sources, softwares and pcs with
+ different operating systems, need aggregation system"
+```
+
+One saved session. Real work, not test data — a problem I'd been planning
+through the day before.
+
+**Why that mattered.** Incrementing the version without a migration path
+would have sent that file straight down the "refuse to open" branch,
+permanently, from every surface including the phone. Nothing would have
+been deleted. Nothing would have failed in the test suite. The file would
+simply have stopped opening — correctly, according to a policy working
+exactly as designed.
+
+**What I specified.** A read-time migration lane: a registry of known
+upgrades applied in memory only, so an older file is brought up to date as
+it's read and the file on disk is never touched. Only a version with no
+registered upgrade still hits discard-or-refuse. The migration widens what
+counts as readable; it doesn't weaken what happens to something genuinely
+unreadable.
+
+The plan was written constraints-first, with the migration step ordered
+explicitly *before* the version bump and an instruction not to reorder
+them, because in the other order the destructive window is real. Each step
+carried its own falsifier — what to measure, what it must read, and what
+it means if it reads something else. For this one: open the real saved
+session after the change, confirm its text is intact, and hash the file
+before and after to prove the migration never wrote.
+
+**Then I reviewed the implementation, and found two things the plan hadn't
+protected against.** An AI agent wrote the code from that plan. Reviewing
+the diff rather than the summary it returned is what turned these up;
+neither is visible from a written report of the work, because the report
+is produced by the same process that did it.
+
+The first was a silent failure waiting for the *next* version bump. The
+migration registry mapped an old version straight to its upgrade function,
+and the loading code assumed every registered function landed on the
+current version. True while there's one migration. Add a second, and a
+file at the oldest version runs only the first hop and is then accepted as
+fully current — remaining upgrade skipped, no error, no warning. I proved
+it rather than arguing it: set the version constant forward by one, fed it
+an old file, and watched it load clean when it should have refused. The
+fix makes each migration declare the version it upgrades *to* and walks
+the chain, so a file that can't reach the current version falls through to
+the loud path instead of the quiet one.
+
+The second was worse, because it was an absence. The migration lane — the
+most dangerous path in the whole change, the reason the plan was ordered
+the way it was — had **no test at all**. It looked covered. There were
+several tests about schema mismatches. But every one of them wrote a file
+at the *current* version and then incremented the constant, which
+exercises the refuse-and-discard branch and never once reaches the upgrade
+branch. A green suite, over the exact code whose failure would have made
+my own saved work unopenable.
+
+**The lesson.** Two, and the second is the one I'd want to be asked about.
+
+A version number is a promise to files that already exist. The cost of
+breaking it isn't paid by the code you're writing — it's paid by data
+someone already chose to keep, on a path no failing test will ever point
+at, because from the code's point of view, refusing to open a file it
+doesn't understand *is* success.
+
+And a test suite tells you which branches were exercised, never which were
+skipped. Several tests named the schema policy, and it was easy —
+correct-looking, even — to read that cluster as coverage. What made the
+gap visible wasn't reading the tests. It was asking which specific input
+reaches this specific line, and finding that nothing in the suite ever
+produced one.
+
+---
+
+## 13. Earlier problems, more briefly
 
 Six from earlier in the project. Same shape, less space.
 

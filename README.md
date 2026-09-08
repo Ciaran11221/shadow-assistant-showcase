@@ -131,6 +131,16 @@ what makes this work from mobile data and not only from home Wi-Fi. See
 for how that was found and fixed. Acknowledged immediately either way, so you
 never stand waiting on a boot.
 
+**A version policy that refuses rather than guesses, with a migration lane in
+front of it.** Stored session files carry a schema integer. On an unrecognised
+version a temporary file is discarded and a saved one is refused and left on
+disk — never half-read, never silently upgraded. Known versions are migrated on
+read, in memory, so opening a file never rewrites it. Each migration declares
+the version it produces and the loader walks the chain, so a missing hop fails
+loudly instead of accepting a half-upgraded file as current. See
+[case study 12](CASE-STUDIES.md#12-a-version-bump-that-would-have-made-real-work-unopenable)
+for the saved file this protects, and the untested branch found while reviewing it.
+
 **Latency as a feature.** Fixed phrases are pre-rendered as audio clips in the
 real voice, so "Yes?" is instant rather than synthesised. Slow skills speak an
 interim line while they work, because several seconds of silence is
