@@ -141,6 +141,16 @@ loudly instead of accepting a half-upgraded file as current. See
 [case study 12](CASE-STUDIES.md#12-a-version-bump-that-would-have-made-real-work-unopenable)
 for the saved file this protects, and the untested branch found while reviewing it.
 
+**A self-healing record that never acts on its own.** The desktop app records
+which boots actually worked — four startup checkpoints plus a soak window, so a
+crash loop can't keep stamping itself as healthy — and keeps a small rolling
+snapshot of configuration in front of the encrypted backup. It diagnoses and
+reports; it restores nothing without someone pressing a button, and it never
+puts source files back, because git already holds every version of those. See
+[case study 13](CASE-STUDIES.md#13-the-one-word-default-that-would-have-left-the-machine-unstartable)
+for the threading default that would have made a restart leave the machine down,
+and for the two faults the same review found in my own plan.
+
 **Latency as a feature.** Fixed phrases are pre-rendered as audio clips in the
 real voice, so "Yes?" is instant rather than synthesised. Slow skills speak an
 interim line while they work, because several seconds of silence is

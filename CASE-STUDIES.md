@@ -1,13 +1,14 @@
 # Case studies
 
-Problems from this project that took real work — twelve recent ones in
+Problems from this project that took real work — thirteen recent ones in
 detail, six earlier ones briefly. Each follows the same shape: what it looked like,
 what I assumed, what the evidence actually said, and what I changed.
 
-Two of them (11 and 12) come from the way this project is now built: I
+Three of them (11, 12 and 13) come from the way this project is now built: I
 plan a change, an AI coding agent implements it, and I review the diff
-rather than the summary it hands back. Both are included because of what
-that review caught, not in spite of it.
+rather than the summary it hands back. All three are included because of what
+that review caught, not in spite of it — and 13 because half of what it
+caught was wrong in my own plan.
 
 The pattern across all of them is the same, and it's the point of this
 document.
@@ -722,7 +723,86 @@ produced one.
 
 ---
 
-## 13. Earlier problems, more briefly
+## 13. The one-word default that would have left the machine unstartable
+
+**Symptom.** None. Every test passed — 68 new ones for the module, and the
+full suite of 56 clean. This one was caught by reading the diff.
+
+**The setup.** I'd specified a self-healing feature: record which boots
+actually worked, so a broken one can be diagnosed against the last good
+one. A boot only counts as good if it survives a soak window — 120
+seconds — because otherwise a crash loop stamps a fresh "known good" every
+cycle and the record ends up pointing at the very state doing the
+crashing. The implementation was a timer:
+
+```python
+threading.Timer(SOAK_SECONDS, promote_if_soaked).start()
+```
+
+That line is faithful to the plan. The plan was wrong.
+
+**What I checked.** Four properties, none of them interesting alone:
+
+1. `threading.Timer` inherits its daemon flag from the creating thread.
+   Created on the main thread, it is **non-daemon** — so the interpreter
+   waits for it at exit. Confirmed by running it, rather than trusting my
+   memory of the documentation.
+2. Every *other* thread in that file — the web server, the voice loop, the
+   startup watcher — is explicitly `daemon=True`. This was the only one
+   that wasn't.
+3. There is no `os._exit` or `sys.exit` anywhere in the file, so nothing
+   forces the process down past a lingering thread.
+4. The single-instance lock is a named Windows mutex whose handle is
+   stored and never released. Windows frees it **when the process exits**.
+
+**What they meant together.** Quitting the app inside the soak window left
+the process alive, holding the mutex, for the rest of the 120 seconds. The
+relauncher — the detached helper that brings the app back after a restart —
+waits 60 seconds for that mutex and then gives up.
+
+So a restart in the first minute of a boot would have left the machine with
+the app down, the tray icon already gone, and the one process that could
+have restarted it having quietly timed out. That is the precise failure the
+restart design exists to prevent: it spawns the relauncher *before* stopping
+anything, so there is always a way back. The way back was still there. It
+just couldn't get in.
+
+Worst of all during rapid restarts — which is exactly the workflow the
+feature's own safety rule had been written to protect.
+
+**The fix is `daemon=True`.** Safe, because the promotion function already
+refuses to run unless a boot is still in progress, so a process on its way
+out has nothing to promote.
+
+**Why no test would have found it.** The defect isn't in a function. It
+lives in the interaction between a thread's default flag, an OS handle's
+lifetime, and a timeout in a different file — and it only appears when a
+person quits at the wrong moment. There is no unit that fails.
+
+**The part I'd rather leave out, which is why it's here.** Four findings came
+out of that review. Two of them were faults in *my plan*, not in the code
+written from it.
+
+I had specified that the always-on health line should report "N settings
+files changed" and "N commits since". Both are ordinary daily activity — the
+line would have been non-empty most days, on a machine with nothing wrong
+with it. That is the exact failure the step I wrote opens by warning about,
+three paragraphs above the mistake.
+
+And the falsifier I attached to it — the measurement meant to prove the step
+correct — asked *"is it silent when nothing has changed?"* The question that
+mattered was *"is it silent when something has changed but nothing is
+wrong?"* The implementation answered my question correctly, and passed.
+
+**What I take from it.** A falsifier that only tests the case its author had
+in mind is not a falsifier. Reviewing generated code catches what the
+generator got wrong; reviewing it against a specification you wrote yourself
+catches what *you* got wrong — and that second one is easier to miss,
+precisely because the code agrees with you.
+
+---
+
+## 14. Earlier problems, more briefly
 
 Six from earlier in the project. Same shape, less space.
 
