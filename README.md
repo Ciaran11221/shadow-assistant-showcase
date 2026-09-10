@@ -2,11 +2,11 @@
 
 A private, JARVIS-inspired AI system spanning an Android phone and a Windows
 desktop, working as one machine with no cloud service in the middle.
-Wake-word activated, cross-device aware, and extended by 24 capability modules
+Wake-word activated, cross-device aware, and extended by 25 capability modules
 it discovers at runtime.
 
-69,000 lines of Python and Kotlin. 8,111 test assertions across 62 CI-gated
-suites, 94 merged pull requests. Running cost to date: 97 cents.
+88,521 lines of Python and Kotlin. 9,954 test assertions across 86 CI-gated
+suites, 164 merged pull requests. Running cost to date: under €1.50.
 
 This repository is a write-up. The implementation is private; what's here is
 the design, the reasoning behind it, and a few debugging stories that show how
