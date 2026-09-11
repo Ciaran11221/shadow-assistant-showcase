@@ -252,7 +252,7 @@ side effect of ordinary conversation.
 A voice assistant is awkward to test: the interesting failures involve a
 microphone, a room, and a person talking. Three layers cover that.
 
-**Unit suites, offline.** Around 1,500 assertions across 36 suites, no network
+**Unit suites, offline.** 10,048 assertions across 86 suites, no network
 and no audio hardware required, running in about a minute. Each suite runs in
 its own process — one of them deliberately swaps out the routing modules to
 test the router in isolation, which is fine alone and poisonous to anything

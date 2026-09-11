@@ -5,8 +5,8 @@ desktop, working as one machine with no cloud service in the middle.
 Wake-word activated, cross-device aware, and extended by 25 capability modules
 it discovers at runtime.
 
-88,521 lines of Python and Kotlin. 9,954 test assertions across 86 CI-gated
-suites, 164 merged pull requests. Running cost to date: under €1.50.
+89,766 lines of Python and Kotlin. 10,048 test assertions across 86 CI-gated
+suites, 170 merged pull requests. Running cost to date: under €1.50.
 
 This repository is a write-up. The implementation is private; what's here is
 the design, the reasoning behind it, and a few debugging stories that show how
@@ -43,6 +43,12 @@ consistent synthesised voice, without sending your speech to anyone.
   home LAN and does that last local hop on request.
 - **Interruptible.** Talk over it and it stops mid-sentence, keeps the context,
   and takes whatever you say next as the new request.
+- **Conversation mode** — a toggle that drops the wake-word requirement
+  entirely for back-and-forth talk, holding a short-term memory of that
+  session so "tell me more about that" resolves against what was just said.
+  A write or delete still can't slip through as ordinary chat: those need an
+  explicit spoken prefix, so casual conversation is structurally unable to
+  trigger a command.
 
 ---
 
@@ -225,7 +231,7 @@ export-then-delete path against a one-line invariant (*after = before −
 exported*), plus an injected mid-export outage to prove nothing is deleted when
 the write fails. The very first run found a real bug — deletion matched entries
 by value, so exporting one of two identical entries destroyed both, with no
-second copy anywhere. Around 1,500 assertions across 36 suites run offline in
+second copy anywhere. 10,048 assertions across 86 suites run offline in
 under a minute; twenty-four separate harnesses fuzz the riskier surfaces.
 
 **Breaking the voice pipeline on purpose, so it doesn't break by accident.**
@@ -283,9 +289,9 @@ Actively developed, and in daily use — which is why the problems in the case
 studies are the ones they are. Most of them only surface when you rely on
 something every day rather than demoing it.
 
-Roughly 55,000 lines of Python and Kotlin, around 50 self-registering skill
-modules, and a test suite of about 1,500 assertions that runs offline. The
-private repository keeps a "critiques and roadmap" section listing what's
+89,766 lines of Python and Kotlin, 25 self-registering skill modules, and a
+test suite of 10,048 assertions across 86 CI-gated suites that runs offline.
+The private repository keeps a "critiques and roadmap" section listing what's
 weakest and what's built but not yet verified in real use — it's maintained
 in the same spirit as the case studies here, and it's usually the more
 interesting document.
