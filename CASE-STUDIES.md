@@ -1,6 +1,6 @@
 # Case studies
 
-Problems from this project that took real work — twenty recent ones in
+Problems from this project that took real work — twenty-one recent ones in
 detail, six earlier ones briefly. Each follows the same shape: what it looked like,
 what I assumed, what the evidence actually said, and what I changed.
 

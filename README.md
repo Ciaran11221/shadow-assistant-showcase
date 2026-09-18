@@ -5,8 +5,9 @@ desktop, working as one machine with no cloud service in the middle.
 Wake-word activated, cross-device aware, and extended by 25 capability modules
 it discovers at runtime.
 
-89,766 lines of Python and Kotlin. 10,048 test assertions across 86 CI-gated
-suites, 170 merged pull requests. Running cost to date: under €1.50.
+100,361 lines of Python and Kotlin. 10,692 test assertions across 100 CI-gated
+suites, 205 merged pull requests. Running cost to date: under €1.50 — the
+two paid tiers exist, are budget-capped, and have never actually been needed.
 
 This repository is a write-up. The implementation is private; what's here is
 the design, the reasoning behind it, and a few debugging stories that show how
@@ -49,6 +50,16 @@ consistent synthesised voice, without sending your speech to anyone.
   A write or delete still can't slip through as ordinary chat: those need an
   explicit spoken prefix, so casual conversation is structurally unable to
   trigger a command.
+- **Sleeps without closing.** One trigger drops it to nothing-is-listening and
+  actually releases what it was holding — the audio stream closed, the models
+  unloaded — rather than muting a microphone that stays open. Waking back up is
+  deliberately a second act, because an accidental off costs you nothing and an
+  accidental on opens a microphone nobody asked for.
+- **Notices, on a local model only.** It can watch what's on screen and speak
+  unprompted — but that path is wired to an on-device model and physically
+  cannot reach a cloud provider, because a window title carries email subjects
+  and document names. It can only ever *say* something; it has no write path at
+  all.
 
 ---
 
@@ -231,8 +242,9 @@ export-then-delete path against a one-line invariant (*after = before −
 exported*), plus an injected mid-export outage to prove nothing is deleted when
 the write fails. The very first run found a real bug — deletion matched entries
 by value, so exporting one of two identical entries destroyed both, with no
-second copy anywhere. 10,048 assertions across 86 suites run offline in
-under a minute; twenty-four separate harnesses fuzz the riskier surfaces.
+second copy anywhere. 10,692 assertions across 100 suites run offline in
+under a minute; thirty-three separate harnesses fuzz and benchmark the
+riskier surfaces.
 
 **Breaking the voice pipeline on purpose, so it doesn't break by accident.**
 A real recording gets pushed through independent, worsening distortions —
@@ -241,6 +253,34 @@ recognition pipeline until it reliably fails. That failure point is a number,
 tracked over time, so a fix can be proven rather than felt. It runs itself
 now: real audio from normal use gets swept automatically in the background,
 off the assistant's own thread, so testing never costs it any responsiveness.
+
+**A background agent that is structurally unable to do anything but talk.**
+The newest piece can speak without being asked — it watches active-window
+state and decides whether anything is worth saying. That is the same shape as
+a module I deleted earlier in the project for judging everything that passed
+through it and silently *writing* what it decided was worth keeping. So the
+difference is built in rather than asserted: the module's entire import list
+is the audit surface, and it imports exactly two things — a local-only model
+call and the speech path. No notes, no journal, no contacts, no memory
+module; there is no function it could call to write anything. Three further
+constraints are enforced the same way: it never reaches a cloud provider
+(window titles carry email subjects), it never speaks over a live session,
+and a file-backed brake can stop it from a phone, because a stop command
+delivered over the same connection the loop is saturating is not a brake.
+
+**Training a voice from real recordings, and three instruments that lied.**
+The default voice is now a model I trained myself on extracted game
+dialogue, rather than an off-the-shelf one. Getting there meant building
+measurements for "does this sound right", and the useful part is that the
+first three were each confidently wrong in a different way: one took a single
+sample of a process that turned out to be non-deterministic, one put a binary
+cut through a continuous property, and one used a test case structurally
+incapable of showing the effect it was built to detect. A one-variable
+control settled in a single run what a week of instrumentation had not, and
+a later listening test had to be rebuilt after a catch pair proved its design
+couldn't tell the model apart from the slot it was played in. The conclusion
+I actually shipped was to stop trusting the metric past a certain precision
+and use my own ears, which is not the answer I wanted.
 
 **Saying no to my own idea.** Mid-build on a feature, I proposed a bigger
 version of it to myself: three tools able to hand off between them and
@@ -275,11 +315,14 @@ thing I've taken from building this, and it's what those write-ups are about.
 `AudioRecord`, Bluetooth audio routing, OkHttp
 **Desktop** — Python, FastAPI, WebSockets, Whisper, and three interchangeable
 offline TTS engines (Piper with a custom effects chain, Kokoro, XTTS) — no cloud
-speech synthesis anywhere
+speech synthesis anywhere, and pre-rendered clips for fixed lines so the common
+replies cost nothing to say
 **Wake word** — sherpa-onnx keyword spotting, on-device, open-vocabulary
 **Networking** — WebSocket over a private VPN mesh, Wake-on-LAN with a relay
 device for off-network wake
-**AI** — tiered routing across four providers with cost control
+**AI** — tiered routing across four cloud providers with cost control, plus a
+local on-device tier (ollama) that private content is routed to exclusively
+**Voice training** — a Piper model fine-tuned on extracted real dialogue
 
 ---
 
@@ -289,8 +332,8 @@ Actively developed, and in daily use — which is why the problems in the case
 studies are the ones they are. Most of them only surface when you rely on
 something every day rather than demoing it.
 
-89,766 lines of Python and Kotlin, 25 self-registering skill modules, and a
-test suite of 10,048 assertions across 86 CI-gated suites that runs offline.
+100,361 lines of Python and Kotlin, 25 self-registering skill modules, and a
+test suite of 10,692 assertions across 100 CI-gated suites that runs offline.
 The private repository keeps a "critiques and roadmap" section listing what's
 weakest and what's built but not yet verified in real use — it's maintained
 in the same spirit as the case studies here, and it's usually the more
