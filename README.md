@@ -1,13 +1,20 @@
 # Shadow
 
-A private, JARVIS-inspired AI system spanning an Android phone and a Windows
-desktop, working as one machine with no cloud service in the middle.
-Wake-word activated, cross-device aware, and extended by 25 capability modules
-it discovers at runtime.
+A private personal operating layer over a Windows desktop and an Android
+phone, working as one machine with no cloud service in the middle. It
+supervises its own startup, isolates untrusted extensions in their own
+processes, gates every capability behind a switch, arbitrates which device
+owns the microphone, and schedules work between a local model and a metered
+cloud one by how sensitive the content is.
 
-100,361 lines of Python and Kotlin. 10,692 test assertions across 100 CI-gated
-suites, 205 merged pull requests. Running cost to date: under €1.50 — the
-two paid tiers exist, are budget-capped, and have never actually been needed.
+It started as a voice assistant. Voice is now one of six ways in — wake word,
+typed chat, a global hotkey, phone screens, Android share and clipboard
+intents, and ambient triggers that nobody initiated at all.
+
+100,700 lines of Python and Kotlin across 25 capability modules discovered at
+runtime. 10,704 test assertions across 101 CI-gated suites, 226 merged pull
+requests. Running cost to date: under €1.50 — the two paid tiers exist, are
+budget-capped, and have never actually been needed.
 
 This repository is a write-up. The implementation is private; what's here is
 the design, the reasoning behind it, and a few debugging stories that show how
@@ -15,10 +22,36 @@ the harder problems were actually solved.
 
 ---
 
+## The mechanisms, before the features
+
+The features below are the visible half. The half that took the work is
+underneath, and it is the part that stopped this being a voice assistant:
+
+    process supervision   boot checkpoints and a soak window, so a crash
+                          loop cannot keep stamping itself healthy
+    extension isolation   third-party modules run as separate OS processes,
+                          JSON only, reading exactly the fields their
+                          manifest declares — added without being trusted
+    capability gating      every module, and individual functions inside
+                          one, switchable at runtime with no restart
+    device arbitration    both machines hear the wake phrase; a pooling
+                          window and priority order resolve exactly one
+    compute scheduling    private content is routed to an on-device model
+                          that cannot reach a cloud provider; GPU memory is
+                          released after each ambient check and skipped
+                          entirely while a game has focus
+    versioned state       stored sessions carry a schema integer, are
+                          migrated on read, and are REFUSED rather than
+                          half-read when the version is unknown
+    power management      sleep closes the audio stream and unloads the
+                          models rather than muting a microphone
+
 ## What it does
 
 Say "Hey Shadow" and it answers — from whichever device is nearest, in a
-consistent synthesised voice, without sending your speech to anyone.
+consistent synthesised voice, without sending your speech to anyone. Or type
+it, or press a hotkey, or share text into it from another Android app, or let
+it notice something and speak first.
 
 - **News** — briefings filtered against your stated interests and tolerance,
   drillable by topic or position ("the third one"), with stories you've already
@@ -242,7 +275,7 @@ export-then-delete path against a one-line invariant (*after = before −
 exported*), plus an injected mid-export outage to prove nothing is deleted when
 the write fails. The very first run found a real bug — deletion matched entries
 by value, so exporting one of two identical entries destroyed both, with no
-second copy anywhere. 10,692 assertions across 100 suites run offline in
+second copy anywhere. 10,704 assertions across 101 suites run offline in
 under a minute; thirty-three separate harnesses fuzz and benchmark the
 riskier surfaces.
 
@@ -332,8 +365,9 @@ Actively developed, and in daily use — which is why the problems in the case
 studies are the ones they are. Most of them only surface when you rely on
 something every day rather than demoing it.
 
-100,361 lines of Python and Kotlin, 25 self-registering skill modules, and a
-test suite of 10,692 assertions across 100 CI-gated suites that runs offline.
+100,700 lines of Python and Kotlin, 25 self-registering capability modules,
+and a test suite of 10,704 assertions across 101 CI-gated suites that runs
+offline.
 The private repository keeps a "critiques and roadmap" section listing what's
 weakest and what's built but not yet verified in real use — it's maintained
 in the same spirit as the case studies here, and it's usually the more
