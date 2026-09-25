@@ -1,12 +1,12 @@
 # Case studies
 
-Problems from this project that took real work — twenty-six recent ones in
+Problems from this project that took real work — twenty-seven recent ones in
 detail, six earlier ones briefly. Each follows the same shape: what it looked like,
 what I assumed, what the evidence actually said, and what I changed.
 
-Three of them (11, 12 and 13) were caught by reading the diff rather than the
+Four of them (11, 12, 13 and 27) were caught by reading the diff rather than the
 summary of the work. A summary is written by whatever produced the change, so
-it cannot check itself. All three are included because of what that review
+it cannot check itself. All four are included because of what that review
 caught — and 13 because half of what it caught was wrong in my own plan.
 
 The pattern across all of them is the same, and it's the point of this
@@ -1929,6 +1929,20 @@ parameters — the same act, protected differently depending on which door it ca
 through. The test I wrote for the fix fails against the old code, and its
 failure output shows the ungated path reaching the real calendar, which is
 precisely what the guard exists to prevent.
+
+---
+
+## 27. A delete safeguard that deleted
+
+A recycle bin's move step had a backup path for folders Windows won't move.
+With one file held open, that backup path erased the other files from both
+places: 3 files in, 1 file left.
+
+The existing test replaced the move step with a stand-in, so the backup path
+never ran.
+
+The fix removed the backup path entirely. A move is now all-or-nothing, and a
+new test holds a file open and checks that every file survives.
 
 ---
 
